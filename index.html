@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trivial FP Pro - Euskera</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f1f5f9;
+            overflow-x: hidden;
+        }
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Board Styling */
+        .board-wrapper {
+            position: relative;
+            width: 650px;
+            height: 650px;
+            margin: auto;
+            background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 100px rgba(0,0,0,0.5);
+        }
+
+        .tile {
+            position: absolute;
+            width: 42px;
+            height: 38px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid rgba(255,255,255,0.1);
+            transform-origin: center;
+        }
+
+        .tile.highlight {
+            box-shadow: 0 0 20px #fff, 0 0 40px currentColor;
+            transform: scale(1.15);
+            z-index: 50;
+            border: 2px solid white;
+            animation: pulse 1.2s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.6; transform: scale(1.1); }
+            to { opacity: 1; transform: scale(1.25); }
+        }
+
+        .tile.hq {
+            border: 3px solid gold;
+            font-weight: bold;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .hub {
+            position: absolute;
+            width: 80px; 
+            height: 80px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: #facc15;
+            color: #1e293b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            z-index: 60;
+            box-shadow: 0 0 30px rgba(250, 204, 21, 0.5);
+            cursor: pointer;
+        }
+
+        .hub.highlight {
+            box-shadow: 0 0 40px #fff;
+            animation: pulse 1.2s infinite alternate;
+            border: 4px solid white;
+        }
+
+        .player-token {
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 2px solid white;
+            z-index: 100;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .glass {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+        }
+
+        .dice-box {
+            width: 100px;
+            height: 100px;
+            background: white;
+            color: #0f172a;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .wedge-slot {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            background: #334155;
+        }
+
+        #question-overlay, #rules-overlay, #confirm-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="glass p-10 w-full max-w-4xl">
+            <div class="flex justify-between items-start mb-2">
+                <h1 class="text-4xl font-black text-yellow-500 tracking-tighter">TRIVIAL FP <span class="text-lg font-light text-slate-500">Euskera Edizioa</span></h1>
+                <div class="flex gap-2">
+                    <button onclick="toggleAdminPanel()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 transition flex items-center gap-2 text-xs font-bold">
+                        <i class="fas fa-edit"></i> GALDERAK KONFIGURATU
+                    </button>
+                    <button onclick="showRules()" class="p-2 hover:text-blue-400 transition">
+                        <i class="fas fa-info-circle text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="text-slate-400 mb-8">Lanbide Heziketarako joko didaktikoa</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div>
+                    <h3 class="font-bold mb-4 uppercase text-xs tracking-widest text-blue-400">Jokalariak</h3>
+                    <div id="setup-players" class="space-y-3"></div>
+                    <button onclick="addPlayer()" class="mt-4 w-full py-2 border border-dashed border-slate-600 rounded text-sm hover:bg-slate-800 transition">
+                        + Jokalaria Gehitu
+                    </button>
+                </div>
+                <div>
+                    <h3 class="font-bold mb-4 uppercase text-xs tracking-widest text-green-400">Kategoriak (Izenak)</h3>
+                    <div id="setup-categories" class="grid grid-cols-1 gap-2"></div>
+                    <button onclick="startGame()" class="mt-8 w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold shadow-xl shadow-blue-900/30 transition-all uppercase tracking-widest">
+                        HASI JOKOA
+                    </button>
+                    <p class="text-[10px] text-slate-500 mt-4 text-center">Oharra: Behin jokoa hasita, ezin izango dira galderak aldatu.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game UI -->
+    <div id="game-ui" class="hidden game-layout">
+        <!-- Left: Player Stats -->
+        <div class="flex flex-col gap-4">
+            <div class="glass p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Jokalariak</h2>
+                    <button onclick="showRestartConfirm()" class="text-[10px] text-red-400 hover:text-red-300 font-bold uppercase tracking-tighter flex items-center gap-1">
+                        <i class="fas fa-undo"></i> RE-START
+                    </button>
+                </div>
+                <div id="active-players-list" class="space-y-3"></div>
+            </div>
+            
+            <button onclick="showRules()" class="glass p-3 text-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition">
+                <i class="fas fa-book-open text-blue-400"></i> Arauak ikusi
+            </button>
+        </div>
+
+        <!-- Center: The Board -->
+        <div class="flex flex-col items-center justify-center">
+            <div class="board-wrapper" id="board">
+                <div class="hub" id="hub-center" onclick="handleHubClick()">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <div id="tiles-container"></div>
+                <div id="tokens-container"></div>
+            </div>
+            
+            <div id="status-msg" class="mt-6 text-xl font-bold text-yellow-500 animate-pulse text-center">
+                Kargatzen...
+            </div>
+        </div>
+
+        <!-- Right: Dice & Info -->
+        <div class="flex flex-col gap-4">
+            <div class="glass p-6 flex flex-col items-center">
+                <h2 class="text-xs font-bold text-slate-500 uppercase mb-6 tracking-widest">Dadoa</h2>
+                <div id="dice" class="dice-box mb-6" onclick="rollDice()">
+                    <i class="fas fa-dice-d6"></i>
+                </div>
+                <button id="roll-btn" onclick="rollDice()" class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold">BOTA</button>
+            </div>
+
+            <div class="glass p-4">
+                <h2 class="text-xs font-bold text-slate-500 uppercase mb-4 tracking-widest">Kategoriak</h2>
+                <div id="cat-legend" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Overlay -->
+    <div id="rules-overlay" onclick="closeRules()">
+        <div class="glass max-w-lg w-full p-8" onclick="event.stopPropagation()">
+            <h2 class="text-2xl font-bold text-yellow-500 mb-4 border-b border-slate-700 pb-2">Jokoaren Arauak</h2>
+            <div class="space-y-4 text-slate-300 text-sm leading-relaxed">
+                <p><strong>1. Helburua:</strong> Sei kategorietako gaztatxo guztiak lortu koloretako kopak dituzten gelaxketako galderak erantzunez eta erdiko koroara iritsi.</p>
+                <p><strong>2. Mugimendua:</strong> Dadoa bota eta argitutako gelaxka batera mugitu. Sistemak bakarrik **helmugetako** gelaxkak erakutsiko dizkizu.</p>
+                <p><strong>3. Galderak:</strong> Gelaxka bakoitzak kolore bat du. Kolore horri dagokion galdera asmatu behar duzu. Asmatzen baduzu, berriro bota dezakezu.</p>
+                <p><strong>4. Irabazlea:</strong> Sei gaztatxoak dituzunean, erdiko koroara joan behar duzu eta kategoria aleatorio bateko galdera bat asmatu.</p>
+            </div>
+            <button onclick="closeRules()" class="mt-8 w-full py-3 bg-blue-600 rounded-lg font-bold">ULERTU DUT</button>
+        </div>
+    </div>
+
+    <!-- Restart Confirmation Modal -->
+    <div id="confirm-modal">
+        <div class="glass p-8 max-sm w-full text-center mx-4">
+            <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+            <h2 class="text-xl font-bold mb-2">Partida amaitu?</h2>
+            <p class="text-slate-400 text-sm mb-6">Honek egungo partida amaitu eta hasierako pantailara eramango zaitu. Ziur zaude?</p>
+            <div class="flex gap-3">
+                <button onclick="closeRestartConfirm()" class="flex-1 py-2 bg-slate-700 rounded-lg font-bold">EZ</button>
+                <button onclick="restartGame()" class="flex-1 py-2 bg-red-600 rounded-lg font-bold">BAI, RE-START</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Modal Overlay -->
+    <div id="question-overlay">
+        <div class="glass w-full max-w-2xl p-8 relative overflow-hidden mx-4">
+            <div id="q-timer-bar" class="absolute top-0 left-0 h-1 bg-blue-500 transition-all duration-100" style="width: 100%"></div>
+            
+            <div class="flex justify-between items-center mb-6">
+                <span id="q-cat-name" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider text-white">Kategoria</span>
+                <span id="q-timer-text" class="font-mono text-xl text-blue-400">20s</span>
+            </div>
+
+            <h2 id="q-text" class="text-2xl font-semibold mb-8 leading-tight">Galdera kargatzen...</h2>
+
+            <div id="q-options" class="grid grid-cols-1 gap-4"></div>
+        </div>
+    </div>
+
+    <!-- Admin Panel (Only for Setup) -->
+    <div id="admin-panel" class="fixed inset-0 bg-slate-900 z-[2000] hidden overflow-y-auto p-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="flex justify-between items-center mb-10">
+                <h2 class="text-3xl font-bold">Galderen Konfigurazioa</h2>
+                <button onclick="toggleAdminPanel()" class="bg-blue-600 px-6 py-2 rounded-lg font-bold">GORDE ETA ITXI</button>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div class="glass p-6">
+                    <h3 class="text-xl font-bold mb-6 text-yellow-500 flex items-center gap-2">
+                        <i class="fas fa-palette"></i> Koloreak eta Izenak
+                    </h3>
+                    <div id="admin-cats-list" class="space-y-4"></div>
+                </div>
+                <div class="glass p-6">
+                    <h3 class="text-xl font-bold mb-6 text-green-500 flex items-center gap-2">
+                        <i class="fas fa-question-circle"></i> Galderen Bankua
+                    </h3>
+                    <div id="admin-qs-list" class="space-y-6"></div>
+                    <button onclick="addEmptyQuestion()" class="mt-6 w-full py-3 border-2 border-dashed border-slate-700 rounded-lg hover:bg-slate-800 transition">+ Galdera Gehitu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS & INITIAL STATE ---
+        const COLORS = ["#3b82f6", "#a855f7", "#22c55e", "#eab308", "#f43f5e", "#06b6d4"];
+        const ICONS = ["laptop", "bolt", "cog", "clipboard-list", "shield-alt", "globe"];
+        
+        let state = {
+            players: [
+                { name: "Aitor", color: COLORS[0], pos: "center", wedges: [false, false, false, false, false, false] },
+                { name: "Maider", color: COLORS[1], pos: "center", wedges: [false, false, false, false, false, false] }
+            ],
+            categories: [
+                { name: "Informatika", color: COLORS[0], icon: ICONS[0] },
+                { name: "Elektrizitatea", color: COLORS[1], icon: ICONS[1] },
+                { name: "Mekanika", color: COLORS[2], icon: ICONS[2] },
+                { name: "Administrazioa", color: COLORS[3], icon: ICONS[3] },
+                { name: "Segurtasuna", color: COLORS[4], icon: ICONS[4] },
+                { name: "Orokorra", color: COLORS[5], icon: ICONS[5] }
+            ],
+            questions: [
+                { cat: 0, text: "Zer da CPU bat?", options: ["Prozesatzeko unitate zentrala", "Pantaila mota bat", "Saguaren kablea", "Teklatuaren tekla"], correct: 0 },
+                { cat: 1, text: "Zein da korrontearen intentsitatearen unitatea?", options: ["Volt", "Ohm", "Ampere", "Watt"], correct: 2 },
+                { cat: 2, text: "Zertarako erabiltzen da kalibrea?", options: ["Pisuak neurtzeko", "Distantzia txikiak neurtzeko", "Tenperatura hartzeko", "Abiadura neurtzeko"], correct: 1 },
+                { cat: 3, text: "Zer esan nahi du BEZ akronimoak?", options: ["Berezko Ekoizpen Zerbitzua", "Balio Erantsiaren gaineko Zerga", "Batasun Ekonomikoaren Zati", "Beti Egindako Zorrak"], correct: 1 },
+                { cat: 4, text: "Laneko arriskuen prebentzioan, zer da PPE bat?", options: ["Plan Partikularra", "Banakako Babes Ekipoa", "Prebentzio Plan Orokorra", "Ekipo Publiko Eskasua"], correct: 1 },
+                { cat: 5, text: "Zein da Euskal Herriko mendirik altuena?", options: ["Aneto", "Gorbeia", "Hiru Erregeen Mahaia", "Aizkorri"], correct: 2 }
+            ],
+            currentPlayer: 0,
+            diceRoll: 0,
+            isRolling: false,
+            validMoves: [],
+            tiles: [], 
+            timer: null,
+            timeLeft: 20
+        };
+
+        // --- NAVIGATION & SCREENS ---
+        function startGame() {
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            // Reiniciar estado de juego
+            state.players.forEach(p => {
+                p.pos = "center";
+                p.wedges = [false, false, false, false, false, false];
+            });
+            state.currentPlayer = 0;
+            state.validMoves = [];
+            state.isRolling = false;
+
+            generateBoardData();
+            renderBoard();
+            renderCategoryLegends();
+            updateStatusMsg();
+        }
+
+        function showRestartConfirm() {
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+
+        function closeRestartConfirm() {
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+
+        function restartGame() {
+            closeRestartConfirm();
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+            renderSetupPlayers();
+            renderSetupCategories();
+        }
+
+        // --- BOARD GENERATION ---
+        function generateBoardData() {
+            state.tiles = [];
+            state.tiles.push({ id: "center", type: "center", cat: -1, x: 325, y: 325, neighbors: [] });
+
+            for (let s = 0; s < 6; s++) {
+                for (let t = 1; t <= 5; t++) {
+                    const angle = (s * 60) * (Math.PI / 180);
+                    const dist = t * 50;
+                    state.tiles.push({
+                        id: `spoke-${s}-${t}`,
+                        type: "spoke",
+                        cat: (s + t) % 6,
+                        x: 325 + Math.sin(angle) * dist,
+                        y: 325 - Math.cos(angle) * dist,
+                        neighbors: [] 
+                    });
+                }
+            }
+
+            const ringCount = 42;
+            for (let i = 0; i < ringCount; i++) {
+                const angle = (i * (360 / ringCount)) * (Math.PI / 180);
+                const dist = 300;
+                let type = "normal";
+                if (i % 7 === 0) type = "hq"; 
+
+                state.tiles.push({
+                    id: `ring-${i}`,
+                    type: type,
+                    cat: i % 6,
+                    x: 325 + Math.sin(angle) * dist,
+                    y: 325 - Math.cos(angle) * dist,
+                    neighbors: []
+                });
+            }
+            
+            linkTiles();
+        }
+
+        function linkTiles() {
+            for (let s = 0; s < 6; s++) {
+                addNeighbor("center", `spoke-${s}-1`);
+                for (let t = 1; t < 5; t++) {
+                    addNeighbor(`spoke-${s}-${t}`, `spoke-${s}-${t+1}`);
+                }
+                addNeighbor(`spoke-${s}-5`, `ring-${s * 7}`);
+            }
+            for (let i = 0; i < 42; i++) {
+                addNeighbor(`ring-${i}`, `ring-${(i + 1) % 42}`);
+            }
+        }
+
+        function addNeighbor(id1, id2) {
+            const t1 = state.tiles.find(t => t.id === id1);
+            const t2 = state.tiles.find(t => t.id === id2);
+            if (t1 && t2) {
+                if (!t1.neighbors.includes(id2)) t1.neighbors.push(id2);
+                if (!t2.neighbors.includes(id1)) t2.neighbors.push(id1);
+            }
+        }
+
+        // --- UI RENDERING ---
+        function renderBoard() {
+            const container = document.getElementById('tiles-container');
+            container.innerHTML = '';
+            state.tiles.forEach(t => {
+                if (t.id === "center") return;
+                const el = document.createElement('div');
+                el.className = `tile ${t.type === 'hq' ? 'hq' : ''}`;
+                el.id = `tile-el-${t.id}`;
+                el.style.left = `${t.x - 21}px`;
+                el.style.top = `${t.y - 19}px`;
+                
+                const cat = state.categories[t.cat];
+                el.style.backgroundColor = cat.color + '33';
+                el.style.borderColor = cat.color;
+                el.style.color = cat.color;
+                
+                if (t.type === 'hq') {
+                    el.innerHTML = `<i class="fas fa-trophy"></i>`;
+                } else {
+                    el.innerHTML = `<i class="fas fa-${cat.icon} text-[10px]"></i>`;
+                }
+
+                el.onclick = () => handleTileClick(t.id);
+                container.appendChild(el);
+            });
+            renderTokens();
+        }
+
+        function renderTokens() {
+            const container = document.getElementById('tokens-container');
+            container.innerHTML = '';
+            state.players.forEach((p, i) => {
+                const tile = state.tiles.find(t => t.id === p.pos);
+                if (!tile) return;
+                
+                const token = document.createElement('div');
+                token.className = 'player-token';
+                token.style.backgroundColor = p.color;
+                const offset = i * 4;
+                token.style.left = `${tile.x - 13 + offset}px`;
+                token.style.top = `${tile.y - 13 + offset}px`;
+                container.appendChild(token);
+            });
+
+            const list = document.getElementById('active-players-list');
+            list.innerHTML = state.players.map((p, i) => `
+                <div class="p-3 rounded-xl border-l-4 ${state.currentPlayer === i ? 'bg-slate-700 border-blue-500 shadow-lg' : 'bg-slate-800/40 border-slate-700'}">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-sm ${state.currentPlayer === i ? 'text-white' : 'text-slate-400'}">${p.name}</span>
+                        ${state.currentPlayer === i ? '<span class="text-[10px] bg-blue-500 px-2 rounded-full uppercase">TXANDA</span>' : ''}
+                    </div>
+                    <div class="flex gap-1">
+                        ${p.wedges.map((w, ci) => `
+                            <div class="wedge-slot flex items-center justify-center" style="background: ${w ? state.categories[ci].color : '#1e293b'}">
+                                <i class="fas fa-certificate text-[8px] text-white ${w ? '' : 'hidden'}"></i>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateStatusMsg() {
+            const player = state.players[state.currentPlayer];
+            document.getElementById('status-msg').innerText = `${player.name}, zure txanda da: Bota dadoa!`;
+        }
+
+        // --- GAME PLAY LOGIC ---
+        function rollDice() {
+            if (state.isRolling || state.validMoves.length > 0) return;
+            state.isRolling = true;
+            
+            const diceEl = document.getElementById('dice');
+            const icons = ["fa-dice-one", "fa-dice-two", "fa-dice-three", "fa-dice-four", "fa-dice-five", "fa-dice-six"];
+            
+            let count = 0;
+            const anim = setInterval(() => {
+                diceEl.innerHTML = `<i class="fas ${icons[Math.floor(Math.random()*6)]}"></i>`;
+                count++;
+                if (count > 12) {
+                    clearInterval(anim);
+                    state.diceRoll = Math.floor(Math.random() * 6) + 1;
+                    diceEl.innerHTML = `<i class="fas ${icons[state.diceRoll - 1]}"></i>`;
+                    calculateMoves();
+                    state.isRolling = false;
+                }
+            }, 70);
+        }
+
+        function calculateMoves() {
+            const player = state.players[state.currentPlayer];
+            state.validMoves = findMoves(player.pos, state.diceRoll);
+            
+            state.validMoves.forEach(m => {
+                if (m === 'center') {
+                    document.getElementById('hub-center').classList.add('highlight');
+                } else {
+                    const el = document.getElementById(`tile-el-${m}`);
+                    if (el) el.classList.add('highlight');
+                }
+            });
+            document.getElementById('status-msg').innerText = `${player.name}: Aukeratu HELMUGA!`;
+        }
+
+        function findMoves(startId, steps) {
+            let results = new Set();
+            function traverse(currentId, remaining, lastId) {
+                if (remaining === 0) {
+                    results.add(currentId);
+                    return;
+                }
+                const tile = state.tiles.find(t => t.id === currentId);
+                if (tile && tile.neighbors) {
+                    tile.neighbors.forEach(nId => {
+                        if (nId !== lastId) {
+                            traverse(nId, remaining - 1, currentId);
+                        }
+                    });
+                }
+            }
+            traverse(startId, steps, null);
+            return Array.from(results);
+        }
+
+        function handleTileClick(tileId) {
+            if (!state.validMoves.includes(tileId)) return;
+            movePlayer(tileId);
+        }
+
+        function handleHubClick() {
+            if (!state.validMoves.includes('center')) return;
+            movePlayer('center');
+        }
+
+        function movePlayer(targetId) {
+            state.validMoves.forEach(m => {
+                if (m === 'center') {
+                    document.getElementById('hub-center').classList.remove('highlight');
+                } else {
+                    const el = document.getElementById(`tile-el-${m}`);
+                    if (el) el.classList.remove('highlight');
+                }
+            });
+            state.validMoves = [];
+            state.players[state.currentPlayer].pos = targetId;
+            renderTokens();
+            setTimeout(() => askQuestion(targetId), 400);
+        }
+
+        function askQuestion(tileId) {
+            const tile = state.tiles.find(t => t.id === tileId);
+            const player = state.players[state.currentPlayer];
+            
+            let catIdx;
+            if (tile.id === 'center') {
+                catIdx = Math.floor(Math.random() * 6);
+            } else {
+                catIdx = tile.cat;
+            }
+
+            const cat = state.categories[catIdx];
+            const pool = state.questions.filter(q => q.cat == catIdx);
+            const q = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : state.questions[0];
+
+            document.getElementById('q-cat-name').innerText = cat.name;
+            document.getElementById('q-cat-name').style.backgroundColor = cat.color;
+            document.getElementById('q-text').innerText = q.text;
+            
+            const optionsCont = document.getElementById('q-options');
+            optionsCont.innerHTML = q.options.map((opt, i) => `
+                <button onclick="checkAnswer(${i}, ${q.correct}, ${catIdx}, '${tile.type}')" 
+                    class="w-full text-left p-5 rounded-xl bg-slate-800/80 border border-slate-700 hover:border-blue-500 hover:bg-slate-700 transition-all flex justify-between group">
+                    <span>${opt}</span>
+                    <span class="opacity-0 group-hover:opacity-100 transition-opacity">Aukeratu <i class="fas fa-chevron-right ml-2 text-xs"></i></span>
+                </button>
+            `).join('');
+
+            document.getElementById('question-overlay').style.display = 'flex';
+            startTimer();
+        }
+
+        function startTimer() {
+            state.timeLeft = 20;
+            const bar = document.getElementById('q-timer-bar');
+            const text = document.getElementById('q-timer-text');
+            
+            clearInterval(state.timer);
+            state.timer = setInterval(() => {
+                state.timeLeft -= 0.1;
+                bar.style.width = (state.timeLeft / 20) * 100 + "%";
+                text.innerText = Math.ceil(state.timeLeft) + "s";
+                if (state.timeLeft <= 0) {
+                    clearInterval(state.timer);
+                    handleFail();
+                }
+            }, 100);
+        }
+
+        function checkAnswer(selected, correct, catIdx, tileType) {
+            clearInterval(state.timer);
+            const btns = document.getElementById('q-options').children;
+            
+            if (selected === correct) {
+                btns[selected].classList.add('bg-green-600', 'border-green-400', 'text-white');
+                setTimeout(() => handleSuccess(catIdx, tileType), 1000);
+            } else {
+                btns[selected].classList.add('bg-red-600', 'border-red-400', 'text-white');
+                btns[correct].classList.add('bg-green-600/40', 'border-green-400', 'text-white');
+                setTimeout(() => handleFail(), 1500);
+            }
+        }
+
+        function handleSuccess(catIdx, tileType) {
+            const player = state.players[state.currentPlayer];
+            if (tileType === 'hq') {
+                player.wedges[catIdx] = true;
+                if (player.wedges.every(w => w) && player.pos === 'center') {
+                    // Custom end screen instead of alert
+                    document.getElementById('status-msg').innerHTML = `<span class="text-3xl text-green-500">ZORIONAK! ${player.name} IRABAZI DU!</span>`;
+                    setTimeout(restartGame, 5000);
+                    return;
+                }
+            }
+            
+            document.getElementById('question-overlay').style.display = 'none';
+            document.getElementById('status-msg').innerText = "Zuzen! Jarraitu jolasten.";
+            renderTokens(); 
+        }
+
+        function handleFail() {
+            document.getElementById('question-overlay').style.display = 'none';
+            nextTurn();
+        }
+
+        function nextTurn() {
+            state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+            updateStatusMsg();
+            renderTokens();
+        }
+
+        // --- SETUP SCREEN RENDERING ---
+        function addPlayer() {
+            if (state.players.length < 6) {
+                state.players.push({
+                    name: `Ikaslea ${state.players.length + 1}`,
+                    color: COLORS[state.players.length],
+                    pos: "center",
+                    wedges: [false, false, false, false, false, false]
+                });
+                renderSetupPlayers();
+            }
+        }
+
+        function renderSetupPlayers() {
+            const cont = document.getElementById('setup-players');
+            cont.innerHTML = state.players.map((p, i) => `
+                <div class="flex gap-2">
+                    <input type="text" value="${p.name}" onchange="state.players[${i}].name=this.value" class="flex-1 bg-slate-800 border-0 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500">
+                    <input type="color" value="${p.color}" onchange="state.players[${i}].color=this.value" class="w-10 h-10 bg-transparent border-0 cursor-pointer">
+                    <button onclick="state.players.splice(${i},1); renderSetupPlayers()" class="text-red-500 px-2 hover:text-red-300 transition"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function renderSetupCategories() {
+            const cont = document.getElementById('setup-categories');
+            cont.innerHTML = '';
+            state.categories.forEach((c, i) => {
+                const el = document.createElement('div');
+                el.className = "flex items-center gap-2";
+                el.innerHTML = `
+                    <div class="w-4 h-4 rounded-full" style="background: ${c.color}"></div>
+                    <input type="text" value="${c.name}" onchange="state.categories[${i}].name=this.value" class="flex-1 bg-slate-800 border-0 rounded px-3 py-1 text-xs focus:ring-1 focus:ring-green-500">
+                `;
+                cont.appendChild(el);
+            });
+        }
+
+        function renderCategoryLegends() {
+            const cont = document.getElementById('cat-legend');
+            cont.innerHTML = state.categories.map(c => `
+                <div class="flex items-center gap-3 bg-slate-800/40 p-2 rounded border-l-4" style="border-color: ${c.color}">
+                    <i class="fas fa-${c.icon} text-xs" style="color: ${c.color}"></i>
+                    <span class="text-xs font-bold uppercase tracking-tighter">${c.name}</span>
+                </div>
+            `).join('');
+        }
+
+        // --- ADMIN PANEL FUNCTIONS ---
+        function toggleAdminPanel() {
+            const p = document.getElementById('admin-panel');
+            p.classList.toggle('hidden');
+            if (!p.classList.contains('hidden')) renderAdminContent();
+        }
+
+        function renderAdminContent() {
+            const cats = document.getElementById('admin-cats-list');
+            cats.innerHTML = state.categories.map((c, i) => `
+                <div class="flex gap-2 items-center bg-slate-800 p-3 rounded">
+                    <div class="flex-1">
+                        <label class="text-[10px] text-slate-500 uppercase font-bold">Kategoria Izena</label>
+                        <input type="text" value="${c.name}" onchange="state.categories[${i}].name=this.value; renderCategoryLegends(); renderSetupCategories()" class="w-full bg-slate-900 border-0 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-500 uppercase font-bold">Kolorea</label>
+                        <input type="color" value="${c.color}" onchange="state.categories[${i}].color=this.value; renderBoard(); renderCategoryLegends(); renderSetupCategories()" class="w-10 h-10 block bg-transparent cursor-pointer">
+                    </div>
+                </div>
+            `).join('');
+
+            const qs = document.getElementById('admin-qs-list');
+            qs.innerHTML = state.questions.map((q, i) => `
+                <div class="p-4 bg-slate-800 rounded relative group border border-slate-700">
+                    <button onclick="state.questions.splice(${i},1); renderAdminContent()" class="absolute top-2 right-2 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-trash"></i></button>
+                    <select onchange="state.questions[${i}].cat=parseInt(this.value)" class="bg-slate-900 text-xs mb-2 border-0 rounded p-1 text-slate-300">
+                        ${state.categories.map((c, ci) => `<option value="${ci}" ${q.cat == ci ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    </select>
+                    <input type="text" value="${q.text}" onchange="state.questions[${i}].text=this.value" class="w-full bg-slate-900 border-0 rounded px-2 py-2 mb-2 text-sm font-semibold" placeholder="Galderaren testua...">
+                    <div class="grid grid-cols-2 gap-2">
+                        ${q.options.map((opt, oi) => `
+                            <div class="flex items-center gap-1">
+                                <input type="radio" name="q-${i}" ${q.correct === oi ? 'checked' : ''} onclick="state.questions[${i}].correct=${oi}" title="Erantzun zuzena">
+                                <input type="text" value="${opt}" onchange="state.questions[${i}].options[${oi}]=this.value" class="bg-slate-900 border-0 rounded px-2 py-1 text-xs flex-1" placeholder="Aukera ${oi+1}">
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addEmptyQuestion() {
+            state.questions.push({ cat: 0, text: "Galdera Berria?", options: ["A", "B", "C", "D"], correct: 0 });
+            renderAdminContent();
+        }
+
+        function showRules() {
+            document.getElementById('rules-overlay').style.display = 'flex';
+        }
+
+        function closeRules() {
+            document.getElementById('rules-overlay').style.display = 'none';
+        }
+
+        // --- INIT ---
+        window.onload = () => {
+            renderSetupPlayers();
+            renderSetupCategories();
+        };
+
+    </script>
+</body>
+</html>
